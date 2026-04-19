@@ -1,3 +1,5 @@
+// script.js
+
 const CONFIG = {
     larguraForroPadrao: 0.20,
     tamanhosBarras: [4, 5, 6, 7]
@@ -5,11 +7,72 @@ const CONFIG = {
 
 // Histórico de cálculos
 let historico = [];
+// Guarda último resultado para usar na área PRO
+let ultimoResultadoBasico = null;
 
-/**
- * Função principal de cálculo
- * Obtém os valores dos inputs, valida e executa o cálculo apropriado
- */
+/* =================== LOGIN SIMPLES =================== */
+function carregarUsuario() {
+    const raw = localStorage.getItem("usuarioForro");
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function salvarUsuario(usuario) {
+    localStorage.setItem("usuarioForro", JSON.stringify(usuario));
+}
+
+function aplicarUsuarioNaUI(usuario) {
+    const overlay = document.getElementById("auth-overlay");
+    const userName = document.getElementById("user-name");
+    const userPlan = document.getElementById("user-plan");
+    const planPill = document.getElementById("plan-pill");
+    const avatar = document.querySelector(".avatar-placeholder");
+
+    if (overlay) overlay.style.display = "none";
+    if (userName) userName.textContent = usuario.nome || "Usuário";
+
+    const ehPro = usuario.plano === "pro";
+    if (userPlan) userPlan.textContent = ehPro ? "Plano PRO" : "Plano Free";
+    if (planPill) planPill.textContent = ehPro ? "Plano PRO" : "Plano Free";
+
+    if (avatar && usuario.nome) {
+        avatar.textContent = usuario.nome.trim().charAt(0).toUpperCase();
+    }
+
+    atualizarEstadoPro(ehPro);
+}
+
+function atualizarEstadoPro(ehPro) {
+    const proOverlay = document.getElementById("pro-overlay");
+    const proContent = document.getElementById("pro-content");
+    const badgePro = document.getElementById("badge-pro");
+
+    if (!proOverlay || !proContent || !badgePro) return;
+
+    if (ehPro) {
+        proOverlay.style.display = "none";
+        proContent.style.opacity = "1";
+        proContent.style.pointerEvents = "auto";
+        badgePro.textContent = "PRO Ativo";
+        badgePro.style.background = "rgba(16,185,129,0.1)";
+        badgePro.style.color = "#059669";
+        badgePro.style.borderColor = "rgba(16,185,129,0.3)";
+    } else {
+        proOverlay.style.display = "flex";
+        proContent.style.opacity = "0.5";
+        proContent.style.pointerEvents = "none";
+        badgePro.textContent = "Somente PRO";
+        badgePro.style.background = "rgba(249, 115, 22, 0.1)";
+        badgePro.style.color = "#f97316";
+        badgePro.style.borderColor = "rgba(249,115,22,0.3)";
+    }
+}
+
+/* =================== CÁLCULO PRINCIPAL =================== */
 function calcular() {
     const ladoA = parseFloat(document.getElementById("ladoA").value);
     const ladoB = parseFloat(document.getElementById("ladoB").value);
@@ -17,15 +80,14 @@ function calcular() {
     const larguraForro = parseFloat(document.getElementById("larguraForro").value) || CONFIG.larguraForroPadrao;
     const resultadoDiv = document.getElementById("resultado");
 
-    // Validar entradas
     if (!validarEntradas(ladoA, ladoB, larguraForro, resultadoDiv)) {
+        ultimoResultadoBasico = null;
         return;
     }
 
-    // Executar cálculo baseado no modo selecionado
     let resultado = null;
 
-    switch(modo) {
+    switch (modo) {
         case "A":
             resultado = calcularNormal("A", ladoA, ladoB, larguraForro);
             break;
@@ -35,29 +97,65 @@ function calcular() {
         case "corte":
             resultado = calcularComCorte(ladoA, ladoB, larguraForro);
             break;
-        default: // Automático
+        default: {
+            // AUTOMÁTICO: testa normal A, normal B e corte, pega menor perda
             const resultadoA = calcularNormal("A", ladoA, ladoB, larguraForro);
             const resultadoB = calcularNormal("B", ladoA, ladoB, larguraForro);
+            const resultadoCorte = calcularComCorte(ladoA, ladoB, larguraForro);
 
-            // Seleciona o resultado com menor sobra
-            resultado = resultadoA && resultadoB 
-                ? (parseFloat(resultadoA.sobraTotal) <= parseFloat(resultadoB.sobraTotal) ? resultadoA : resultadoB) 
-                : resultadoA || resultadoB;
+            const candidatos = [];
+
+            if (resultadoA) {
+                candidatos.push({
+                    ...resultadoA,
+                    perdaEquivalente: parseFloat(resultadoA.sobraTotal)
+                });
+            }
+
+            if (resultadoB) {
+                candidatos.push({
+                    ...resultadoB,
+                    perdaEquivalente: parseFloat(resultadoB.sobraTotal)
+                });
+            }
+
+            if (resultadoCorte) {
+                candidatos.push({
+                    ...resultadoCorte,
+                    perdaEquivalente: parseFloat(resultadoCorte.perdaTotal)
+                });
+            }
+
+            if (!candidatos.length) {
+                resultado = null;
+            } else {
+                candidatos.sort((a, b) => a.perdaEquivalente - b.perdaEquivalente);
+                resultado = candidatos[0];
+            }
+            break;
+        }
     }
-// Chama a função que monta o HTML para dentro do resultadoDiv
+
     exibirResultado(resultado, resultadoDiv);
 
-    // Adicionar ao histórico
     if (resultado) {
+        ultimoResultadoBasico = {
+            ...resultado,
+            ladoA,
+            ladoB,
+            larguraForro
+        };
+
         adicionarAoHistorico({
             data: new Date(),
             dimensoes: { ladoA, ladoB, larguraForro },
             modo,
             resultado
         });
+    } else {
+        ultimoResultadoBasico = null;
     }
 }
-
 
 function validarEntradas(ladoA, ladoB, larguraForro, resultadoDiv) {
     if (!ladoA || !ladoB || isNaN(ladoA) || isNaN(ladoB) || ladoA <= 0 || ladoB <= 0) {
@@ -88,7 +186,6 @@ function calcularNormal(sentido, ladoA, ladoB, larguraForro) {
     const barras = Math.ceil(largura / larguraForro);
 
     let melhor = null;
-/*Loop em todos os tamanhos possiveis 4, 5, 6, 7.*/
     CONFIG.tamanhosBarras.forEach(tamanho => {
         const sobra = tamanho - comprimento;
         if (sobra >= 0) {
@@ -101,12 +198,12 @@ function calcularNormal(sentido, ladoA, ladoB, larguraForro) {
     if (!melhor) return null;
 
     return {
-        sentido, /*sentido do forro, A ou B*/
+        sentido,
         tipo: "Sem corte",
-        barras, /*quantidade de reguas */
-        tamanhoBarra: melhor.tamanho, /*4, 5, 6 ou 7*/  
-        sobraTotal: (melhor.sobra * barras).toFixed(2), /*sobra por brras multiplicada pela quantidade de barras*/
-        larguraForro /*largura do forro usada para o cálculo*/
+        barras,
+        tamanhoBarra: melhor.tamanho,
+        sobraTotal: (melhor.sobra * barras).toFixed(2),
+        larguraForro
     };
 }
 
@@ -120,7 +217,7 @@ function calcularComCorte(ladoA, ladoB, larguraForro) {
         const linhas = Math.ceil(opcao.largura / larguraForro);
 
         CONFIG.tamanhosBarras.forEach(tamanho => {
-            const pecasPorBarra = Math.floor(tamanho / opcao.comprimento); /*quantidade de peças do comprimento cabem dentro de 1 barras*/
+            const pecasPorBarra = Math.floor(tamanho / opcao.comprimento);
 
             if (pecasPorBarra >= 2) {
                 const barrasNecessarias = Math.ceil(linhas / pecasPorBarra);
@@ -151,7 +248,7 @@ function exibirResultado(resultado, resultadoDiv) {
         resultadoDiv.innerHTML = `
             <div class="alerta">
                 <h3>Resultado</h3>
-                <p><strong>Não é possível realizar o cálculo com corte para essas medidas.</strong></p>
+                <p><strong>Não é possível realizar o cálculo com essas medidas.</strong></p>
                 <p>Tente outras dimensões ou outro modo de cálculo.</p>
             </div>
         `;
@@ -172,25 +269,27 @@ function exibirResultado(resultado, resultadoDiv) {
     `;
 }
 
+/* =================== HISTÓRICO =================== */
 function adicionarAoHistorico(item) {
-    // Limitar o histórico a 10 itens
     if (historico.length >= 10) {
         historico.pop();
     }
 
-    // Adicionar novo item ao início
     historico.unshift(item);
-
-    // Atualizar a exibição do histórico
     atualizarHistorico();
-
-    // Salvar no localStorage
     salvarHistorico();
 }
 
 function atualizarHistorico() {
     const listaHistorico = document.getElementById("lista-historico");
+    if (!listaHistorico) return;
+
     listaHistorico.innerHTML = "";
+
+    if (!historico.length) {
+        listaHistorico.innerHTML = `<li class="microcopy">Nenhum cálculo ainda.</li>`;
+        return;
+    }
 
     historico.forEach((item, index) => {
         const li = document.createElement("li");
@@ -201,7 +300,7 @@ function atualizarHistorico() {
                 <p><strong>Data:</strong> ${dataFormatada}</p>
                 <p><strong>Dimensões:</strong> ${item.dimensoes.ladoA}m x ${item.dimensoes.ladoB}m</p>
                 <p><strong>Resultado:</strong> ${item.resultado.barras} barras de ${item.resultado.tamanhoBarra}m</p>
-                <button onclick="carregarDoHistorico(${index})">Carregar</button>
+                <button class="btn-secondary btn-small" onclick="carregarDoHistorico(${index})">Carregar</button>
             </div>
         `;
 
@@ -210,7 +309,7 @@ function atualizarHistorico() {
 }
 
 function salvarHistorico() {
-   localStorage.setItem("historicoForro", JSON.stringify(historico));
+    localStorage.setItem("historicoForro", JSON.stringify(historico));
 }
 
 function carregarHistorico() {
@@ -223,12 +322,12 @@ function carregarHistorico() {
 
 function carregarDoHistorico(index) {
     const item = historico[index];
+    if (!item) return;
 
     document.getElementById("ladoA").value = item.dimensoes.ladoA;
     document.getElementById("ladoB").value = item.dimensoes.ladoB;
     document.getElementById("larguraForro").value = item.dimensoes.larguraForro;
 
-    // Encontrar o modo correspondente
     let modoSelecionado = "auto";
     if (item.modo) {
         modoSelecionado = item.modo;
@@ -241,10 +340,163 @@ function carregarDoHistorico(index) {
     }
 
     document.getElementById("modo").value = modoSelecionado;
-
-    // Recalcular para mostrar o resultado
     calcular();
 }
 
-// Carregar histórico ao iniciar a página
-document.addEventListener("DOMContentLoaded", carregarHistorico);
+/* =================== ÁREA PRO =================== */
+function calcularPro() {
+    const usuario = carregarUsuario();
+    if (!usuario || usuario.plano !== "pro") {
+        alert("Área exclusiva para plano PRO. Faça upgrade para utilizar.");
+        return;
+    }
+
+    if (!ultimoResultadoBasico) {
+        alert("Primeiro execute o cálculo de forro para poder calcular os custos.");
+        return;
+    }
+
+    const precoBarra = parseFloat(document.getElementById("precoBarra").value);
+    const precoMaoObra = parseFloat(document.getElementById("precoMaoObra").value) || 0;
+    const resultadoProDiv = document.getElementById("resultado-pro");
+
+    if (!precoBarra || isNaN(precoBarra) || precoBarra <= 0) {
+        resultadoProDiv.innerHTML = `
+            <div class="erro">
+                <p>Informe um <strong>preço por barra</strong> válido para prosseguir.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const { barras, tamanhoBarra, ladoA, ladoB } = ultimoResultadoBasico;
+    const area = ladoA * ladoB;
+
+    const custoMateriais = barras * precoBarra;
+    const custoMaoObra = area * precoMaoObra;
+    const custoTotal = custoMateriais + custoMaoObra;
+
+    resultadoProDiv.innerHTML = `
+        <p><strong>Resumo financeiro PRO</strong></p>
+        <p><strong>Quantidade de barras:</strong> ${barras} un de ${tamanhoBarra} m</p>
+        <p><strong>Preço por barra:</strong> R$ ${precoBarra.toFixed(2)}</p>
+        <p><strong>Custo total de materiais:</strong> R$ ${custoMateriais.toFixed(2)}</p>
+        <p><strong>Área do ambiente:</strong> ${area.toFixed(2)} m²</p>
+        <p><strong>Mão de obra por m²:</strong> R$ ${precoMaoObra.toFixed(2)}</p>
+        <p><strong>Custo total de mão de obra:</strong> R$ ${custoMaoObra.toFixed(2)}</p>
+        <p><strong>CUSTO TOTAL ESTIMADO:</strong> R$ ${custoTotal.toFixed(2)}</p>
+    `;
+}
+
+/* =================== INICIALIZAÇÃO =================== */
+document.addEventListener("DOMContentLoaded", () => {
+    // Login
+    const usuarioExistente = carregarUsuario();
+    if (usuarioExistente) {
+        aplicarUsuarioNaUI(usuarioExistente);
+    }
+
+    const authForm = document.getElementById("auth-form");
+    if (authForm) {
+        authForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const nome = document.getElementById("nome").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const plano = document.getElementById("tipo-conta").value;
+
+            if (!nome || !email) return;
+
+            const usuario = { nome, email, plano };
+            salvarUsuario(usuario);
+            aplicarUsuarioNaUI(usuario);
+        });
+    }
+
+    const btnLogout = document.getElementById("btn-logout");
+    if (btnLogout) {
+        btnLogout.addEventListener("click", () => {
+            localStorage.removeItem("usuarioForro");
+            location.reload();
+        });
+    }
+
+    const btnTornarPro = document.getElementById("btn-tornar-pro");
+    if (btnTornarPro) {
+        btnTornarPro.addEventListener("click", () => {
+            const usuario = carregarUsuario();
+            if (!usuario) {
+                alert("Entre ou cadastre-se primeiro.");
+                return;
+            }
+            usuario.plano = "pro";
+            salvarUsuario(usuario);
+            aplicarUsuarioNaUI(usuario);
+            alert("Plano PRO ativado (simulação).");
+        });
+    }
+
+    const btnUpgradePro = document.getElementById("btn-upgrade-pro");
+    if (btnUpgradePro) {
+        btnUpgradePro.addEventListener("click", () => {
+            const usuario = carregarUsuario();
+            if (!usuario) {
+                alert("Entre ou cadastre-se primeiro.");
+                return;
+            }
+            usuario.plano = "pro";
+            salvarUsuario(usuario);
+            aplicarUsuarioNaUI(usuario);
+            alert("Plano PRO ativado (simulação).");
+        });
+    }
+
+    // Calculadora
+    const btnCalcular = document.getElementById("btn-calcular");
+    if (btnCalcular) btnCalcular.addEventListener("click", calcular);
+
+    const btnLimpar = document.getElementById("btn-limpar");
+    if (btnLimpar) {
+        btnLimpar.addEventListener("click", () => {
+            document.getElementById("ladoA").value = "";
+            document.getElementById("ladoB").value = "";
+            document.getElementById("larguraForro").value = "";
+            document.getElementById("resultado").innerHTML = `
+                <p>Insira as medidas e clique em <strong>Calcular</strong>.</p>
+            `;
+            ultimoResultadoBasico = null;
+            const resPro = document.getElementById("resultado-pro");
+            if (resPro) {
+                resPro.innerHTML = `
+                    <p>Faça primeiro o cálculo de forro, depois preencha os preços e clique em <strong>Calcular custo total</strong>.</p>
+                `;
+            }
+        });
+    }
+
+    const btnCalcularPro = document.getElementById("btn-calcular-pro");
+    if (btnCalcularPro) btnCalcularPro.addEventListener("click", calcularPro);
+
+    // Histórico
+    carregarHistorico();
+
+    // Botões da “pasta” de histórico
+    const btnToggleHistorico = document.getElementById("btn-toggle-historico");
+    const historyBody = document.getElementById("history-body");
+    if (btnToggleHistorico && historyBody) {
+        btnToggleHistorico.addEventListener("click", () => {
+            historyBody.classList.toggle("collapsed");
+            btnToggleHistorico.textContent = historyBody.classList.contains("collapsed")
+                ? "Mostrar"
+                : "Ocultar";
+        });
+    }
+
+    const btnLimparHistorico = document.getElementById("btn-limpar-historico");
+    if (btnLimparHistorico) {
+        btnLimparHistorico.addEventListener("click", () => {
+            historico = [];
+            salvarHistorico();
+            atualizarHistorico();
+        });
+    }
+});

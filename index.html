@@ -1,42 +1,179 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <title>SoftHome - Free & PRO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Forro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Calculadora de Forro</h1>
-        <div class="form-group">
-            <label for="ladoA">Lado A (metros):</label>
-            <input type="number" id="ladoA" min="0.1" step="0.01" required>
-        </div>
-        <div class="form-group">
-            <label for="ladoB">Lado B (metros):</label>
-            <input type="number" id="ladoB" min="0.1" step="0.01" required>
-        </div>
-        <div class="form-group">
-            <label for="larguraForro">Largura do forro (metros):</label>
-            <input type="number" id="larguraForro" value="0.20" min="0.1" step="0.01">
-        </div>
-        <div class="form-group">
-            <label for="modo">Sentido do forro:</label>
-            <select id="modo">
-                <option value="auto">Automático</option>
-                <option value="A">Somente Lado A</option>
-                <option value="B">Somente Lado B</option>
-                <option value="corte">Cálculo pela metade</option>
-            </select>
-        </div>
-        <button onclick="calcular()" class="btn-calcular">Calcular Forro Necessário</button>
-        <div id="resultado"></div>
-        <div id="historico">
-            <h3>Histórico de Cálculos</h3>
-            <ul id="lista-historico"></ul>
+    <!-- Tela de Login/Cadastro -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card">
+            <h1>SoftHome</h1>
+            <p>Entre ou cadastre-se para continuar</p>
+            <form id="auth-form">
+                <label for="nome">Nome</label>
+                <input type="text" id="nome" required placeholder="Seu nome completo">
+
+                <label for="email">E-mail</label>
+                <input type="email" id="email" required placeholder="seuemail@exemplo.com">
+
+                <label for="tipo-conta">Tipo de conta</label>
+                <select id="tipo-conta" required>
+                    <option value="free">Free</option>
+                    <option value="pro">PRO (assinante)</option>
+                </select>
+
+                <button type="submit" class="btn-primary">Entrar</button>
+            </form>
+            <p class="microcopy">
+                Seus dados ficam apenas neste navegador (localStorage).
+            </p>
         </div>
     </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="user-info">
+                <div class="avatar-placeholder">U</div>
+                <div>
+                    <div id="user-name" class="user-name">Usuário</div>
+                    <div id="user-plan" class="user-plan">Plano Free</div>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <h3>Calculadoras</h3>
+                <ul>
+                    <li class="nav-item active">Forro</li>
+                    <li class="nav-item disabled">
+                        Massa (em breve)
+                        <span class="badge">Soon</span>
+                    </li>
+                    <li class="nav-item disabled">
+                        Tijolo (em breve)
+                        <span class="badge">Soon</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btn-tornar-pro" class="btn-outline">Quero ser PRO</button>
+                <button id="btn-logout" class="btn-link">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Conteúdo principal + coluna lateral de histórico -->
+        <main class="main-layout">
+            <!-- Coluna principal -->
+            <div class="main-content">
+                <header class="main-header">
+                    <h2>Calculadora SoftHome</h2>
+                    <div class="plan-pill" id="plan-pill">Plano Free</div>
+                </header>
+
+                <!-- Calculadora principal -->
+                <section class="card">
+                    <h3>Dados do ambiente</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="ladoA">Lado A (m)</label>
+                            <input type="number" id="ladoA" min="0" step="0.01" placeholder="Ex: 3.50">
+                        </div>
+                        <div class="form-group">
+                            <label for="ladoB">Lado B (m)</label>
+                            <input type="number" id="ladoB" min="0" step="0.01" placeholder="Ex: 4.20">
+                        </div>
+                        <div class="form-group">
+                            <label for="larguraForro">Largura da régua (m)</label>
+                            <input type="number" id="larguraForro" min="0" step="0.01" placeholder="Padrão: 0.20">
+                            <small class="microcopy">Se vazio, usa 0,20 m.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="modo">Modo de cálculo</label>
+                            <select id="modo">
+                                <option value="auto">Automático (menor perda)</option>
+                                <option value="A">Sentido Lado A</option>
+                                <option value="B">Sentido Lado B</option>
+                                <option value="corte">Com corte</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="btn-calcular" class="btn-primary">Calcular</button>
+                        <button id="btn-limpar" class="btn-secondary">Limpar</button>
+                    </div>
+                </section>
+
+                <!-- Resultado -->
+                <section class="card">
+                    <h3>Resultado</h3>
+                    <div id="resultado" class="resultado">
+                        <p>Insira as medidas e clique em <strong>Calcular</strong>.</p>
+                    </div>
+                </section>
+
+                <!-- Área PRO separada -->
+                <section class="card card-pro">
+                    <div class="card-pro-header">
+                        <h3>Área PRO - Cálculo de custos</h3>
+                        <span id="badge-pro" class="badge-pro">Somente PRO</span>
+                    </div>
+
+                    <div id="pro-overlay" class="pro-overlay">
+                        <p>Esta área é exclusiva para assinantes PRO.</p>
+                        <button id="btn-upgrade-pro" class="btn-primary btn-small">
+                            Tornar-se PRO
+                        </button>
+                    </div>
+
+                    <div id="pro-content" class="pro-content">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="precoBarra">Preço por barra (R$)</label>
+                                <input type="number" id="precoBarra" min="0" step="0.01" placeholder="Ex: 45,90">
+                            </div>
+                            <div class="form-group">
+                                <label for="precoMaoObra">Mão de obra por m² (R$)</label>
+                                <input type="number" id="precoMaoObra" min="0" step="0.01" placeholder="Ex: 30,00">
+                            </div>
+                        </div>
+
+                        <div class="actions">
+                            <button id="btn-calcular-pro" class="btn-primary">
+                                Calcular custo total
+                            </button>
+                        </div>
+
+                        <div id="resultado-pro" class="resultado">
+                            <p>Faça primeiro o cálculo de forro, depois preencha os preços e clique em <strong>Calcular custo total</strong>.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Coluna lateral: "pasta" de histórico -->
+            <aside class="history-panel">
+                <div class="card history-card">
+                    <div class="history-header">
+                        <h3>Histórico</h3>
+                        <button id="btn-toggle-historico" class="btn-secondary btn-small">Mostrar</button>
+                    </div>
+                    <div id="history-body" class="history-body collapsed">
+                        <ul id="lista-historico" class="lista-historico">
+                            <!-- preenchido via JS -->
+                        </ul>
+                        <button id="btn-limpar-historico" class="btn-link btn-small">Limpar histórico</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
