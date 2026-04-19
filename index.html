@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Forro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Forro</h1>
+        <div class="form-group">
+            <label for="ladoA">Lado A (metros):</label>
+            <input type="number" id="ladoA" min="0.1" step="0.01" required>
+        </div>
+        <div class="form-group">
+            <label for="ladoB">Lado B (metros):</label>
+            <input type="number" id="ladoB" min="0.1" step="0.01" required>
+        </div>
+        <div class="form-group">
+            <label for="larguraForro">Largura do forro (metros):</label>
+            <input type="number" id="larguraForro" value="0.20" min="0.1" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="modo">Sentido do forro:</label>
+            <select id="modo">
+                <option value="auto">Automático</option>
+                <option value="A">Somente Lado A</option>
+                <option value="B">Somente Lado B</option>
+                <option value="corte">Cálculo pela metade</option>
+            </select>
+        </div>
+        <button onclick="calcular()" class="btn-calcular">Calcular Forro Necessário</button>
+        <div id="resultado"></div>
+        <div id="historico">
+            <h3>Histórico de Cálculos</h3>
+            <ul id="lista-historico"></ul>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
